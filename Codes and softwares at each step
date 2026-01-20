@@ -183,14 +183,10 @@ osca --befile tmethylation_bod --get-variance --get-mean --out tmethylation_stat
 osca --befile tmethylation_bod --upper-beta 0.8 --lower-beta 0.2 --make-bod --out tmethylation_bod2
 osca --befile tmethylation_bod2 --make-orm --out methylation_orm
 
-
 3. estimation of the variance explained by the GRM and MRM using OREML
 *prepare phenotypes (proteins), genetic PCs, methylation PCs, and covariates before this step
 *i is the ith PC of proteome
 osca --reml --multi-orm orm.filelist --pheno proteome_pc${i} --out myreml_${i}
-
-4. aggregation of the explained variance across individual proteomic principal components.
-
 
 **Step 5: Epigenome-wide association study (EWAS) of circulating proteins**
 fun_ewas_protein<-function(var.x=var.x, var.race=var.race,var.suffix='',methylationAsOutcome=F,Mvalue=F,INT=F){
@@ -320,7 +316,6 @@ fun_ewas_protein<-function(var.x=var.x, var.race=var.race,var.suffix='',methylat
     dev.off()
 }
 
-
 **Step 6: Gene Ontology enrichment analysis of pQTMs**
 library(ggplot2)
 library(ggrepel)
@@ -414,9 +409,7 @@ dim(res.proteinvar_bycpg)
     temp2=barplot(temp1$count,horiz=T,col=col.posnegcistrans$col[col.posnegcistrans$class==5],border=F, cex.axis=0.8,
                   ylab='number of cis-pQTLs',xlab='number of proteins')
     axis(2, at=as.vector(temp2), labels=paste0(temp1$num),las=2,cex.axis=0.8)
-    
-    #dev.copy2pdf(file='./Fig-proteinvariance_cisSNPnumber.pdf',width=3,height=5)
-
+    dev.copy2pdf(file='./Fig-proteinvariance_cisSNPnumber.pdf',width=3,height=5)
     res.proteinvar_bycpg=dplyr::arrange(res.proteinvar_bycpg,desc(vartopcpg))
     res.proteinvar_bycpg$ciscpg_len=0
     res.proteinvar_bycpg$ciscpg=NA
@@ -434,9 +427,8 @@ dim(res.proteinvar_bycpg)
        }
     }    
     head(res.proteinvar_bycpg)
-    res.proteinvar_bycpg$ciscpg_len
-      
-#save(res.proteinvar_bycpg,file='./Results/pQTM/res.proteinvar_bycpg3.RData')
+    res.proteinvar_bycpg$ciscpg_len      
+save(res.proteinvar_bycpg,file='./Results/pQTM/res.proteinvar_bycpg3.RData')
 load('./Results/pQTM/res.proteinvar_bycpg.RData');dim(res.proteinvar_bycpg)
 load('./Results/pQTM/res.proteinvar_bycpg2.RData');dim(res.proteinvar_bycpg)
 load('./Results/pQTM/res.proteinvar_bycpg3.RData');dim(res.proteinvar_bycpg)
@@ -775,8 +767,7 @@ res.select_proteins_sorted_GO=NA
     }
     
     res.select_proteins_sorted_GO[,1:10]
-    table(unlist(res.select_proteins_sorted_GO))
-    
+    table(unlist(res.select_proteins_sorted_GO))    
 table(as.vector(res.select_proteins_sorted_GO[1,]))
 
 Heatmap(res.select_proteins_sorted_GO,cluster_columns = F,cluster_rows = F,  row_names_side = "left", 
@@ -790,7 +781,6 @@ Heatmap(res.select_proteins_sorted_GO,cluster_columns = F,cluster_rows = F,  row
                   }
               },
               show_heatmap_legend=F)
-
 dev.copy2pdf(file='./Fig-proteinvariance_explained_bottomheatmap.pdf',width=28,height=10)
     
 temp1=res.proteinvar_bycpg
