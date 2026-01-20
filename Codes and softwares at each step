@@ -17,9 +17,308 @@ The pipeline includes the following main steps:
 
 
 **Step 4: Estimation of genetic and epigenetic contributions to blood protein variance**
+This step consisted of four main components: 
+1. calculation of the genetic relationship matrix (GRM)
+
+inputfile=${inputdir}/chr${chr}.dose.vcf.gz
+snp_pruned=${outputdir}/snp_pruned_chr${chr}
+bed_pruned=${outputdir}/bed_pruned_chr${chr}
+grm_pruned=${outputdir}/grm_pruned_chr${chr}
+bed_merged=${outputdir}/bed_merged
+grm_merged=${outputdir}/grm_merged 
+
+# prune SNPs for each chromosome
+for chr in {1..22}
+do
+    echo chr${chr}
+    inputfile=${inputdir}/chr${chr}.dose.vcf.gz
+    snp_pruned=${outputdir}/snp_pruned_chr${chr}
+    bed_pruned=${outputdir}/bed_pruned_chr${chr}
+    echo Processing ${inputfile}
+    
+    plink2 --threads 30 --vcf $inputfile --snps-only --maf 0.05 --hwe 1e-6 --indep-pairwise 50 5 0.2 --out $snp_pruned
+      wc -l ${snp_pruned}.prune.in
+      wc -l ${snp_pruned}.prune.out
+    plink2 --threads 30 --vcf $inputfile --extract ${snp_pruned}.prune.in --make-bed --out $bed_pruned
+done
+
+# merge SNPs from all chromosomes
+for chr in {2..22}
+do
+   echo $chr
+   echo chr${chr}_pruned.bed chr${chr}_pruned.bim chr${chr}_pruned.fam >> ${outputdir}/merged_pruned.txt
+done
+plink2 --bfile chr1_pruned --merge-list merged_pruned.txt --make-bed --out $merged_bed
+
+# calculate GRM
+gcta64 --thread-num 10 --bfile $merged_bed --make-grm --out $merged_grm
+
+# check GRM using R language
+prefix='grm_merged'
+    BinFileName=paste(prefix,".grm.bin",sep="")
+    NFileName=paste(prefix,".grm.N.bin",sep="")
+    IDFileName=paste(prefix,".grm.id",sep="")
+ids=read.table(IDFileName, header = FALSE)
+    colnames(ids)=c("FID", "IID")
+    head(ids)
+    nrow(ids)
+N_values=readBin(NFileName, what = numeric(), n = nrow(ids) * (nrow(ids) + 1) / 2, size = 4)
+    length(N_values)
+    head(N_values)
+grm_values=readBin(BinFileName, what = numeric(), n = nrow(ids) * (nrow(ids) + 1) / 2, size = 4)
+    length(grm_values) 
+    head(grm_values)
+n=nrow(ids)  # Number of individuals
+GRM=matrix(0, n, n)  # Initialize an empty matrix
+    k=1
+    for (i in 1:n) {
+      for (j in 1:i) {
+        GRM[i, j]=grm_values[k]  # Fill lower triangle
+        GRM[j, i]=grm_values[k]  # Fill upper triangle (since it's symmetric)
+        k=k+1
+      }
+    }
+    dim(GRM)
+    GRM[1:5, 1:5]
+    rownames(GRM)=ids$IID
+    colnames(GRM)=ids$IID
+    save(GRM,file='da.GRM_W.RData')
+    sum(is.na(GRM)) 
+    summary(diag(GRM)) 
+    temp1=GRM[lower.tri(GRM,diag=F)]
+    length(temp1) 
+    summary(temp1)    
+    hist(temp1[temp1<0.02], breaks=200, xlab="Genetic relationship (kinship)", main="")
+    hist(temp1[temp1>0.02], breaks=200, xlab="Genetic relationship (kinship)", main="")
+
+# prefix='grm_merged'
+    BinFileName=paste(prefix,".grm.bin",sep="")
+    NFileName=paste(prefix,".grm.N.bin",sep="")
+    IDFileName=paste(prefix,".grm.id",sep="")
+ids=read.table(IDFileName, header = FALSE)
+    colnames(ids)=c("FID", "IID")
+    head(ids)
+    nrow(ids)
+N_values=readBin(NFileName, what = numeric(), n = nrow(ids) * (nrow(ids) + 1) / 2, size = 4)
+    length(N_values) 
+    head(N_values)
+grm_values=readBin(BinFileName, what = numeric(), n = nrow(ids) * (nrow(ids) + 1) / 2, size = 4)
+    length(grm_values)
+    head(grm_values)
+    summary(grm_values)
+
+n=nrow(ids)  # Number of individuals
+GRM=matrix(0, n, n)  # Initialize an empty matrix
+    k=1
+    for (i in 1:n) {
+      for (j in 1:i) {
+        GRM[i, j]=grm_values[k]  # Fill lower triangle
+        GRM[j, i]=grm_values[k]  # Fill upper triangle (since it's symmetric)
+        k=k+1
+      }
+    }
+
+    dim(GRM)
+    GRM[1:5, 1:5]
+    rownames(GRM)=ids$IID
+    colnames(GRM)=ids$IID
+    sum(is.na(GRM))    
+    summary(diag(GRM))
+    temp1=GRM[lower.tri(GRM,diag=F)]
+    length(temp1)  # 43659840
+    summary(temp1)
+    
+    hist(temp1[temp1<0.02], breaks=200, xlab="Genetic relationship (kinship)", main="")
+    hist(temp1[temp1>0.02], breaks=200, xlab="Genetic relationship (kinship)", main="")
+
+# remove cryptic relatedness
+gcta64 --grm $grm_merged --grm-cutoff 0.1 --make-grm --out ${outputdir}/grm_final # 0.025
+
+prefix='grm_final'
+    BinFileName=paste(prefix,".grm.bin",sep="")  # values
+    NFileName=paste(prefix,".grm.N.bin",sep="")  # N of used SNP, only one value, although a long length
+    IDFileName=paste(prefix,".grm.id",sep="")    # IDs for sample
+ids=read.table(IDFileName, header = FALSE)
+    colnames(ids)=c("FID", "IID")
+N_values=readBin(NFileName, what = numeric(), n = nrow(ids) * (nrow(ids) + 1) / 2, size = 4)
+    length(N_values)
+    head(N_values)    
+grm_values=readBin(BinFileName, what = numeric(), n = nrow(ids) * (nrow(ids) + 1) / 2, size = 4)
+    length(grm_values)
+    head(grm_values)
+    summary(grm_values)
+n=nrow(ids)
+GRM=matrix(0, n, n)  # Initialize an empty matrix
+    k=1
+    for (i in 1:n) {
+      for (j in 1:i) {
+        GRM[i, j]=grm_values[k]  # Fill lower triangle
+        GRM[j, i]=grm_values[k]  # Fill upper triangle (since it's symmetric)
+        k=k+1
+      }
+    }
+    dim(GRM)   
+    GRM[1:5, 1:5]
+    rownames(GRM)=ids$IID
+    colnames(GRM)=ids$IID
+    sum(is.na(GRM)) # 0
+    temp1=GRM[lower.tri(GRM)]
+    length(temp1)
+    summary(temp1)
+
+2. calculation of the methylation relationship matrix (MRM)
+# write beta values in a text file
+temp1=rownames(betas)
+file_conn <- file("/gpfs/data/aric/projects/08_EWAS_of_Proteome/Datasets/ARIC_epigenetics/tmethylation.txt", "w")
+cat(paste(c('IID',colnames(betas)), collapse = " "), "\n", file = file_conn)
+for (i in 1:nrow(betas)) {
+  if(i%%1000==0) print(i)
+  cat(paste(c(temp1[i],round(betas[i, ],4)), collapse = " "), "\n", file = file_conn)
+}
+close(file_conn)
+
+# convert text to befile for osca, filter, and estimate ORM
+osca --tefile tmethylation.txt --methylation-beta --make-bod --no-fid --out tmethylation_bod  # --efile/tefile
+osca --befile tmethylation_bod --get-variance --get-mean --out tmethylation_stats
+osca --befile tmethylation_bod --upper-beta 0.8 --lower-beta 0.2 --make-bod --out tmethylation_bod2
+osca --befile tmethylation_bod2 --make-orm --out methylation_orm
+
+
+3. estimation of the variance explained by the GRM and MRM using OREML
+*prepare phenotypes (proteins), genetic PCs, methylation PCs, and covariates before this step
+*i is the ith PC of proteome
+gcta64 --thread-num 20 --grm grm_subset --pheno da.proteomePCs --mpheno {i} --qcovar da.covar_cont --covar da.covar_dicr --reml --reml-est-fix --out ./variance/proteome_pc${i}
+
+4. aggregation of the explained variance across individual proteomic principal components.
 
 
 **Step 5: Epigenome-wide association study (EWAS) of circulating proteins**
+fun_ewas_protein<-function(var.x=var.x, var.race=var.race,var.suffix='',methylationAsOutcome=F,Mvalue=F,INT=F){
+
+    load('var.queryall.RData')
+    inputdir='./chunk_betaQN'
+    resultdir="./Results")
+    var.group=var.queryall$group[var.queryall$var==var.x]
+    var.group
+    outputdir=paste0(resultdir,var.group)
+        if(!dir.exists(outputdir)) {dir.create(outputdir)}
+    var.symbol=var.queryall$symbol[var.queryall$var==var.x]
+    
+    var.covariates1=c('methy_id','RACEGRP51','CENTER')
+    var.covariates2=c('CD8T','CD4T','NK','Bcell','Mono','Neu','PC1_cp','PC2_cp','PC3_cp','PC4_cp','PC5_cp','PC6_cp','PC7_cp','PC8_cp','PC9_cp','PC10_cp','PC1','PC2','PC3','PC4','PC5') 
+    
+    load('./da.IDs_flag.RData')
+    var.samples_exclude=da.IDs_flag$row_names[(da.IDs_flag$flag_sexmismatch==1 | da.IDs_flag$flag_genotypemismatch==1) & !is.na(da.IDs_flag$flag_sexmismatch) & !is.na(da.IDs_flag$flag_genotypemismatch)]
+        length(var.samples_exclude)  # 37
+    
+    ans=foreach(fileid=1:50, .combine=rbind) %dopar% {
+        cat(paste0('Loading chunk ',fileid), '\n')
+    
+        load('./da.methylome_pheno_merged.RData')
+        da.methylome_pheno=da.methylome_pheno[,c(var.x,var.covariates1)]
+        da.methylome_pheno$var.x=as.vector(da.methylome_pheno[[var.x]])        
+        
+        # inverse normal transformation
+        if(INT==T) da.methylome_pheno$var.x=qnorm((rank(da.methylome_pheno$var.x,na.last="keep")-0.5)/sum(!is.na(da.methylome_pheno$var.x)))
+
+        # add covariates
+        load('./da.covar_PCWBC.RData')
+        da.covar_PCWBC=da.covar_PCWBC[,var.covariates2]
+        #table(da.methylome_pheno$methy_id %in% rownames(da.covar_PCWBC))
+        #table(rownames(da.covar_PCWBC) %in% da.methylome_pheno$methy_id)
+        input_file=paste0(inputdir,'/betaQN.all_',fileid,'_IQR.RDS')
+        da.methylome=readRDS(input_file)
+        da.methylome_num=nrow(da.methylome)   # CpG number
+        cat(paste0(da.methylome_num,' CpGs are loaded.'), '\n') 
+        
+        da.temp=cbind(da.methylome_pheno, da.covar_PCWBC)
+            dim(da.temp)
+            
+        var.subset=da.methylome_pheno$RACEGRP51==var.race            
+            table(var.subset) 
+        var.samples=intersect(da.methylome_pheno$methy_id[var.subset], colnames(da.methylome))
+            var.samples=var.samples[!var.samples %in% var.samples_exclude]
+            length(var.samples) # 426 for black with methylome
+            
+        da.temp=da.temp[match(var.samples,da.temp$methy_id),]   
+            dim(da.temp)
+            da.temp=da.temp[complete.cases(da.temp),]
+            dim(da.temp)
+            da.temp$id=1:nrow(da.temp)
+            da.temp_num=nrow(da.temp) 
+      
+        da.methylome=da.methylome[,da.temp$methy_id]
+        res.temp=data.frame(cpg=rownames(da.methylome),num=NA,beta=NA,se=NA,P=NA)
+        for(i in 1:da.methylome_num){
+              da.temp$betavalue=temp1=NA
+              if(i %% 5000 == 1) cat(paste0("Scanning ",i, 'th CpG in chunk ',fileid, ' (PID:',Sys.getpid(),')\n'))
+              da.temp$betavalue=as.vector(da.methylome[i,])
+              
+              if(isTRUE(Mvalue)){ # covert beta value to M value
+                  da.temp$betavalue[da.temp$betavalue<0.001 | da.temp$betavalue>0.999]=NA
+                  da.temp$betavalue=log2(da.temp$betavalue)-log2(1-da.temp$betavalue)
+              }
+              
+              if(sum(!is.na(da.temp$betavalue))/da.temp_num>=0.70){ # some CpGs have too many missing values
+                  if(isTRUE(methylationAsOutcome)){
+                      if(var.race=='B'){
+                          temp1=lm(betavalue~var.x+egfrcrcys_v5+V5AGE51+GENDER51+CD8T+CD4T+NK+Bcell+Mono+Neu+PC1_cp+PC2_cp+PC3_cp+PC4_cp+PC5_cp+PC6_cp+PC7_cp+PC8_cp+PC9_cp+PC10_cp+PC1+PC2+PC3+PC4+PC5, data=da.temp)
+                      }else{
+                          temp1=lm(betavalue~var.x+egfrcrcys_v5+CENTER+V5AGE51+GENDER51+CD8T+CD4T+NK+Bcell+Mono+Neu+PC1_cp+PC2_cp+PC3_cp+PC4_cp+PC5_cp+PC6_cp+PC7_cp+PC8_cp+PC9_cp+PC10_cp+PC1+PC2+PC3+PC4+PC5, data=da.temp)
+                      }
+                  }else{
+                      if(var.race=='B'){
+                          temp1=lm(var.x~betavalue+CD8T+CD4T+NK+Bcell+Mono+Neu+PC1_cp+PC2_cp+PC3_cp+PC4_cp+PC5_cp+PC6_cp+PC7_cp+PC8_cp+PC9_cp+PC10_cp+PC1+PC2+PC3+PC4+PC5, data=da.temp)
+                      }else{
+                          temp1=lm(var.x~betavalue+CENTER+CD8T+CD4T+NK+Bcell+Mono+Neu+PC1_cp+PC2_cp+PC3_cp+PC4_cp+PC5_cp+PC6_cp+PC7_cp+PC8_cp+PC9_cp+PC10_cp+PC1+PC2+PC3+PC4+PC5, data=da.temp)
+                      }
+                  }
+                  temp1=summary(temp1)$coeff
+                  res.temp$num=sum(!is.na(da.temp$betavalue))
+                  res.temp$beta[i]=temp1[2,1]
+                  res.temp$se[i]=temp1[2,2]
+                  res.temp$P[i]=temp1[2,4]
+              }
+        }
+        cat(paste0('Completed chunk ',fileid), '\n')
+        #saveRDS(res.temp,file=paste0(outputdir,'/chunk_',fileid,'.rds'))
+        res.temp
+    }
+    
+    ans=dplyr::arrange(ans,P)
+    
+    cat('CpG number: ',nrow(ans),'\n')
+    cat('NA number: ',sum(is.na(ans$P)),'\n')
+    cat('summary beta: \n')
+    print(summary(ans$beta))
+    cat('summary P:\n')
+    print(summary(ans$P))
+    cat('min raw P:', min(ans$P, na.rm=T),'\n')
+
+    load('./da.methylome_annot_simple.RData')
+    temp1=match(ans$cpg,da.methylome_annot_simple$IlmnID)
+        ans$chr=da.methylome_annot_simple$CHR_hg38[temp1]
+        ans$pos=da.methylome_annot_simple$Start_hg38[temp1]
+        ans$gene=da.methylome_annot_simple$UCSC_RefGene_Name[temp1]
+        ans$location=da.methylome_annot_simple$UCSC_RefGene_Group[temp1]
+        ans$CpGIsland=da.methylome_annot_simple$UCSC_CpG_Islands_Name[temp1]
+        ans$CpGIsland_location=da.methylome_annot_simple$Relation_to_UCSC_CpG_Island[temp1]
+        ans$regulatory_feature=da.methylome_annot_simple$Regulatory_Feature_Group[temp1]
+    head(ans)   
+    
+    saveRDS(ans,file=paste0(outputdir,'/',var.x,'_',var.race,var.suffix,'.rds'))
+    
+    load('./var.queryall.RData')
+    var.symbol_short=var.symbol
+    if(stringr::str_length(var.symbol_short)>31) var.symbol_short=stringr::str_sub(var.symbol_short,1,31)
+    outputexcel=paste0(resultdir,'Table3_',var.symbol,'_',var.race,var.suffix,'.xlsx') 
+    openxlsx::write.xlsx(ans[ans$P<0.05,],file=outputexcel,sheetName=var.symbol_short,firstRow=T)
+   
+    outputqqplot=paste0(resultdir,'Fig_qqplot_',var.symbol,'_',var.race,var.suffix,'.jpeg') 
+    jpeg(filename=outputqqplot, width=600, height=600)
+       qqman::qq(ans$P,main=paste0(var.symbol,' in ',var.race))
+    dev.off()
+}
 
 
 **Step 6: Gene Ontology enrichment analysis of pQTMs**
