@@ -322,5 +322,503 @@ fun_ewas_protein<-function(var.x=var.x, var.race=var.race,var.suffix='',methylat
 
 
 **Step 6: Gene Ontology enrichment analysis of pQTMs**
+library(ggplot2)
+library(ggrepel)
+    
+load('./Results/pQTM/res.GOcis_All.RData')    
+load('./Results/pQTM/res.GOtrans_All.RData')    
+    dim(res.GOcis)   
+    dim(res.GOtrans)
+    res.GOcis$GO=rownames(res.GOcis)
+    res.GOtrans$GO=rownames(res.GOtrans)
+    head(res.GOcis)
+    
+    topGSA(res.GOcis)
+    
+res.GOcommon=intersect(res.GOcis$GO[res.GOcis$FDR<0.05], res.GOtrans$GO[res.GOtrans$FDR<0.05]) 
+    length(res.GOcommon) 
+
+res.GOsig=unique(res.GOcis$GO[res.GOcis$FDR<0.05], res.GOtrans$GO[res.GOtrans$FDR<0.05]) 
+    length(res.GOsig)    
+    head(res.GOsig)
+
+res.GOsig=res.GOcis$GO        
+    length(res.GOsig)    
+    
+temp1=res.GOcis[match(res.GOsig,res.GOcis$GO),]    
+    temp1$score=temp1$DE/temp1$N
+    temp1$log10p=-log10(temp1$FDR)
+    names(temp1)=paste0('cis_',names(temp1))
+    head(temp1)
+
+temp2=res.GOtrans[match(res.GOsig,res.GOtrans$GO),]
+    temp2$score=temp2$DE/temp2$N
+    temp2$log10p=-log10(temp2$FDR)
+    names(temp2)=paste0('trans_',names(temp2))
+    head(temp2)
+    table(rownames(temp1)==rownames(temp2))
+    
+res.GOcombined=cbind(temp1,temp2)    
+    head(res.GOcombined)
+    dim(res.GOcombined)
+    
+    res.GOcombined=res.GOcombined[res.GOcombined$cis_FDR!=1 | res.GOcombined$trans_FDR!=1,] # remove no hit GO
+    dim(res.GOcombined) # 352  18
+    
+    res.GOcombined$col='gray'
+    res.GOcombined$col[res.GOcombined$cis_FDR<0.05 & res.GOcombined$trans_FDR>=0.05]=col.posnegcistrans$col[col.posnegcistrans$class==5]
+    res.GOcombined$col[res.GOcombined$cis_FDR>=0.05 & res.GOcombined$trans_FDR<0.05]=col.posnegcistrans$col[col.posnegcistrans$class==6]
+    res.GOcombined$col[res.GOcombined$cis_FDR<0.05 & res.GOcombined$trans_FDR<0.05]='blue'
+    table(res.GOcombined$col)
+    
+    res.GOcombined$group='not enriched'
+    res.GOcombined$group[res.GOcombined$cis_FDR<0.05 & res.GOcombined$trans_FDR>=0.05]="only enriched for cis-pQTM"
+    res.GOcombined$group[res.GOcombined$cis_FDR>=0.05 & res.GOcombined$trans_FDR<0.05]="only enriched for trans-pQTM"
+    res.GOcombined$group[res.GOcombined$cis_FDR<0.05 & res.GOcombined$trans_FDR<0.05]="enriched for both"
+    table(res.GOcombined$group)
+    
+    res.GOcombined$label=NA
+    temp3=res.GOcombined$cis_log10p>8 | res.GOcombined$trans_log10p>3
+    table(temp3)
+    res.GOcombined$label[temp3]=res.GOcombined$cis_TERM[temp3]
+    head(res.GOcombined)
+
+    res.GOcombined$cis_log2p=-log2(res.GOcombined$cis_FDR)
+    res.GOcombined$trans_log2p=-log2(res.GOcombined$trans_FDR)
+    
+    res.GOcombined$cis_logit=log10(res.GOcombined$cis_FDR/(1-res.GOcombined$cis_FDR))
+    res.GOcombined$trans_logit=log10(res.GOcombined$trans_FDR/(1-res.GOcombined$trans_FDR))
+
+plot(res.GOcombined$cis_log10p~res.GOcombined$trans_log10p,pch=20,cex=0.6,col=res.GOcombined$col,
+     xlab='-log10(FDR) for trans-pQTM',ylab='-log10(FDR) for cis-pQTM')
+
+ggplot(res.GOcombined, aes(x=trans_log10p, y=cis_log10p, color=col, label = label)) +
+  geom_point(size=1)+ geom_text_repel()+
+  scale_color_identity()+ theme_bw()+
+  labs(title = "", x="-log10(FDR) for trans-pQTM", y="-log10(FDR) for cis-pQTM")+
+  xlim(0,12)+ylim(0,11)
+
+# all significant GO terms
+ggplot(res.GOcombined, aes(x=trans_log10p, y=cis_log10p, color=col, label = label,group=group)) +
+  geom_point(size=1)+ 
+  scale_color_identity()+ theme_bw()+ylim(0,12)+
+  labs(title = "", x="-log10(FDR) for trans-pQTMs enrichment", y="-log10(FDR) for cis-pQTMs enrichment")
+dev.copy2pdf(file='./Results/pQTM/Fig-GO_enrichment_All.pdf',width=6,height=6)
 
 **Step 7: Decomposition of protein variance by cis-pQTMs and cis-pQTLs**
+
+dim(res.proteinvar_bycpg)  
+    head(res.proteinvar_bycpg)
+    temp1=table(res.proteinvar_bycpg$cisSNPNum)
+    temp1=data.frame(num=as.numeric(names(temp1)),count=as.numeric(temp1))
+    temp2=barplot(temp1$count,horiz=T,col=col.posnegcistrans$col[col.posnegcistrans$class==5],border=F, cex.axis=0.8,
+                  ylab='number of cis-pQTLs',xlab='number of proteins')
+    axis(2, at=as.vector(temp2), labels=paste0(temp1$num),las=2,cex.axis=0.8)
+    
+    #dev.copy2pdf(file='./Fig-proteinvariance_cisSNPnumber.pdf',width=3,height=5)
+
+    res.proteinvar_bycpg=dplyr::arrange(res.proteinvar_bycpg,desc(vartopcpg))
+    res.proteinvar_bycpg$ciscpg_len=0
+    res.proteinvar_bycpg$ciscpg=NA
+    head(res.proteinvar_bycpg)
+    head(da.temp)
+    for(i in 1:nrow(res.proteinvar_bycpg)){
+       temp1=temp2=temp3=NA
+       temp1=res.proteinvar_bycpg$seqid[i]
+       temp1=da.temp[da.temp$seqid==temp1 & da.temp$cis==1,]
+       if(nrow(temp1)>=0)
+       {
+         temp1=unique(temp1$cpg)
+         res.proteinvar_bycpg$ciscpg_len[i]=length(temp1)
+         res.proteinvar_bycpg$ciscpg[i]=paste0(temp1,collapse=',')
+       }
+    }    
+    head(res.proteinvar_bycpg)
+    res.proteinvar_bycpg$ciscpg_len
+      
+#save(res.proteinvar_bycpg,file='./Results/pQTM/res.proteinvar_bycpg3.RData')
+load('./Results/pQTM/res.proteinvar_bycpg.RData');dim(res.proteinvar_bycpg)
+load('./Results/pQTM/res.proteinvar_bycpg2.RData');dim(res.proteinvar_bycpg)
+load('./Results/pQTM/res.proteinvar_bycpg3.RData');dim(res.proteinvar_bycpg)
+    names(res.proteinvar_bycpg)
+
+load('./Results/pQTM/res.proteinvar_bycpg3.RData')
+  names(res.proteinvar_bycpg)
+  dim(res.proteinvar_bycpg)
+  head(res.proteinvar_bycpg)
+  table(res.proteinvar_bycpg$cisSNPNum==0)   # T:7, F:272
+  table(res.proteinvar_bycpg$ciscpg_len==0)  # T:0, F:279
+  
+res.proteinvar_bycpg=res.proteinvar_bycpg[res.proteinvar_bycpg$cisSNPNum!=0,]  
+  dim(res.proteinvar_bycpg)  # 272
+  
+# ID
+load('./da.IDs_flag.RData')
+load('./da.GWASIDs.RData')
+    head(da.IDs_flag)
+    head(da.GWASIDs)
+    da.IDs_flag$gwasid=da.GWASIDs$gwasid[match(da.IDs_flag$pid,da.GWASIDs$pid)]
+    head(da.IDs_flag)
+    dim(da.IDs_flag)
+    
+# SNP matrix
+load('./da.snpmatrix_dosage.RData')    
+load('./da.snpmatrix_snps.RData')    
+    dim(da.snpmatrix_dosage) # 9345 1988
+    table(rownames(da.snpmatrix_dosage) %in% da.IDs_flag$pid) # T:1432 F:7913
+    
+# methylation matrix
+load('./da.pQTM_W_betavalue.RData')
+    dim(da.pQTM_W_betavalue) # 6986 2092
+    da.pQTM_W_betavalue=t(da.pQTM_W_betavalue)
+    da.pQTM_W_betavalue[1:10,1:10]
+    
+# load phenotype
+load('./Datasets/da.methylome_pheno_mol.RData')
+    dim(da.methylome_pheno)
+    da.methylome_pheno[1:5,1:5]  
+  
+# participant list
+var.part_methyid=da.methylome_pheno$methy_id[da.methylome_pheno$white==1 & !is.na(da.methylome_pheno$white)]
+    length(var.part_methyid)   
+    var.part_methyid[1:10]
+    table(var.part_methyid %in% da.IDs_flag$row_names) 
+    
+var.part_pid=da.IDs_flag$pid[match(var.part_methyid,da.IDs_flag$row_names)]
+    length(var.part_pid)  
+    var.part_pid[1:10]    
+
+table(var.part_methyid %in% rownames(da.pQTM_W_betavalue))
+table(var.part_pid %in% rownames(da.snpmatrix_dosage))    
+    
+# protein matrix
+da.temp0=da.methylome_pheno[match(var.part_methyid,da.methylome_pheno$methy_id),res.proteinvar_bycpg$seqid]   
+    head(da.temp0)
+
+# genotype matrix
+da.temp2=da.snpmatrix_dosage[match(var.part_pid,rownames(da.snpmatrix_dosage)),]    
+    dim(da.temp2)  
+     
+# methylation matrix    
+da.temp3=da.pQTM_W_betavalue[match(var.part_methyid,rownames(da.pQTM_W_betavalue)),]
+    dim(da.temp3) 
+
+# covariates
+var.covariates1=c('RACEGRP51','V5AGE51','GENDER51','CENTER','egfrcrcys_v5')
+da.temp4=da.methylome_pheno[match(var.part_methyid,da.methylome_pheno$methy_id),var.covariates1] 
+    dim(da.temp0) 
+    head(da.temp4)    
+    
+load('./da.covar_PCWBC.RData')
+var.covariates2=c('CD8T','CD4T','NK','Bcell','Mono','Neu','PC1_cp','PC2_cp','PC3_cp','PC4_cp','PC5_cp','PC6_cp','PC7_cp','PC8_cp','PC9_cp','PC10_cp') 
+da.temp5=da.covar_PCWBC[match(var.part_methyid,da.covar_PCWBC$methy_id),var.covariates2]
+    head(da.temp5)
+    da.temp5[1:6,1:6]
+
+# adjust covar for protein (aka. residualize protein for covar)
+da.temp6=da.temp0
+    da.temp6[1:10,1:10]
+    for(j in 1:ncol(da.temp6)){
+      if(j%%50==0) print(j)
+      temp1=temp2=NA
+      temp1=da.temp4
+      temp1$protein=as.vector(da.temp6[,j])
+      head(temp1)
+      temp2=lm(protein~V5AGE51+GENDER51,data=temp1,na.action=na.exclude)
+      da.temp6[,j]=as.vector(scale(resid(temp2),center=T,scale=T))
+    }
+    da.temp6[1:6,1:6]
+    hist(da.temp6$SeqId_6364_7)
+    
+# calculate R2: collect model1: Protein ~ cis-pQTLS + covariate
+names(res.proteinvar_bycpg)
+    table(res.proteinvar_bycpg$cisSNPNum)
+    table(res.proteinvar_bycpg$ciscpg_len)
+    
+res.proteinvar_bycpg$varciscpg=0    
+res.proteinvar_bycpg$varcissnp=0
+res.proteinvar_bycpg$varciscpgadj=0    
+res.proteinvar_bycpg$varcissnpadj=0
+
+  for(i in 1:nrow(res.proteinvar_bycpg)){
+      temp1=temp2=temp3=temp4=temp5=temp6=resid_methy=resid_snp=NA
+      temp1=res.proteinvar_bycpg$seqid[i]
+      print(paste0(i,': ',temp1))
+      
+      # inject beta values of pQTM
+      temp2=temp3=temp4=temp5=temp6=NA
+      temp2=data.frame(protein=as.vector(scale(da.temp0[[temp1]],center=T,scale=T)))  # da.temp6, da.temp0
+      head(temp2)
+      temp3=res.proteinvar_bycpg$ciscpg[i]
+      temp3=stringr::str_split(temp3,',')[[1]]
+      temp3_methy=da.temp3[,temp3,drop = FALSE]
+      head(temp3_methy)
+      for(j in 1:ncol(temp3_methy)){
+        temp6=lm(temp3_methy[,j]~da.temp4$V5AGE51+da.temp4$GENDER51,na.action=na.exclude)
+        temp6=as.vector(resid(temp6))
+        temp3_methy[,j]=temp6
+      }
+      temp2=cbind(temp2,temp3_methy)     # matrix containing protein and cis-pQTMs
+           head(temp2)
+           temp4=NA
+           temp4=lm(protein~.,data=temp2,na.action=na.exclude)
+      res.proteinvar_bycpg$varciscpg[i]=summary(temp4)$r.squared
+      resid_methy=as.vector(resid(temp4)) # 1702
+           
+      # inject genotype of pQTL
+      temp2=temp3=temp4=temp5=temp6=NA
+      temp2=data.frame(protein=as.vector(scale(da.temp0[[temp1]],center=T,scale=T)))
+
+      head(temp2)
+      temp3=res.proteinvar_bycpg$cisSNPList[i] 
+          temp3=stringr::str_split(temp3,',')[[1]]
+          temp3=da.snpmatrix_snps$rsID %in% temp3
+          table(temp3)
+      temp3_snp=da.temp2[,temp3,drop=F]
+      head(temp3_snp)
+      table(complete.cases(temp3_snp))
+      for(j in 1:ncol(temp3_snp)){
+        if(length(unique(temp3_snp[,j][!is.na(temp3_snp[,j])]))>1)temp3_snp[,j]=as.vector(scale(temp3_snp[,j]))
+      }
+      table(complete.cases(temp3_snp))
+      temp2=cbind(temp2,temp3_snp)     # matrix containing protein and cis-pQTLs
+           head(temp2)
+           #names(temp2)[2:length(names(temp2))]=paste0('x',2:length(names(temp2)))
+           #temp2$protein[is.na(temp2$protein)]
+           #temp2=temp2[complete.cases(temp2),]
+           #temp2$x2[is.na(temp2$x2)]=0
+           #table(complete.cases(temp2))
+           temp4=NA
+           temp4=lm(protein~.,data=temp2,na.action=na.exclude)
+      res.proteinvar_bycpg$varcissnp[i]=summary(temp4)$r.squared
+      resid_snp=as.vector(resid(temp4))   
+    
+      # residual of protein-SNP: explained by methylation
+      temp2=temp3=temp4=temp5=temp6=NA
+      temp2=data.frame(protein=resid_snp)             # adjust cis-pQTL      
+      head(temp2)
+      temp3=res.proteinvar_bycpg$ciscpg[i]
+      temp3=stringr::str_split(temp3,',')[[1]]
+      temp3_methy=da.temp3[,temp3,drop=F]
+      for(j in 1:ncol(temp3_methy)){
+        temp3_methy[,j]=as.vector(scale(temp3_methy[,j]))
+      }
+      temp2=cbind(temp2,temp3_methy,da.temp4$V5AGE51,da.temp4$egfrcrcys_v5)     
+           head(temp2)
+           temp4=NA
+           temp4=lm(protein~.,data=temp2,na.action=na.exclude)
+      res.proteinvar_bycpg$varciscpgadj[i]=summary(temp4)$r.squared
+      
+      # residual of protein-methylation: explained by SNP
+      temp2=temp3=temp4=temp5=temp6=NA
+      temp2=data.frame(protein=resid_methy)             # adjust cis-pQTL
+      #temp2=data.frame(protein=as.vector(scale(da.temp0[[temp1]],center=T,scale=T)))       # not adjust cis-pQTL
+      #temp2=data.frame(protein=as.vector(scale(da.temp6[[temp1]],center=T,scale=T)))       # not adjust cis-pQTL
+      head(temp2)
+      temp3=res.proteinvar_bycpg$cisSNPList[i]
+          temp3=stringr::str_split(temp3,',')[[1]]
+          temp3=da.snpmatrix_snps$rsID %in% temp3
+          table(temp3)
+      temp3_snp=da.temp2[,temp3,drop=F]
+      for(j in 1:ncol(temp3_snp)){
+        if(length(unique(temp3_snp[,j][!is.na(temp3_snp[,j])]))>1) temp3_snp[,j]=as.vector(scale(temp3_snp[,j]))
+      }
+      temp2=cbind(temp2,temp3_snp)     
+           head(temp2)
+           temp4=NA
+           temp4=lm(protein~.,data=temp2,na.action=na.exclude)
+      res.proteinvar_bycpg$varcissnpadj[i]=summary(temp4)$r.squared
+    }   
+    
+head(res.proteinvar_bycpg)
+     
+openxlsx::write.xlsx(res.proteinvar_bycpg,file='./res.proteinvar_bycpg2.xlsx')
+write.csv(res.proteinvar_bycpg,file='./res.proteinvar_bycpg2.csv')
+save(res.proteinvar_bycpg,file='./res.proteinvar_bycpg_full.RData')
+
+# figure
+load('./Results/Methy_SNP/res.proteinvar_bycpg_full.RData')
+res.proteinvar_bycpg$varciscpgadj=(1-res.proteinvar_bycpg$varcissnp)*res.proteinvar_bycpg$varciscpgadj
+par(mar=c(4,5,1,1))
+res.proteinvar_bycpg$label=''
+     temp1=res.proteinvar_bycpg$varcissnp>=0.8 | res.proteinvar_bycpg$varciscpg>=0.5
+     table(temp1)
+     res.proteinvar_bycpg$label[temp1]=res.proteinvar_bycpg$protein[temp1]  
+plot(res.proteinvar_bycpg$varciscpg~res.proteinvar_bycpg$varcissnp,pch=20,col='darkblue', cex=0.6,
+     xlab="variance explained by cis-pQTLs", ylab="variance explained by cis-pQTMs")
+     #text(res.proteinvar_bycpg$varcissnp,res.proteinvar_bycpg$varciscpg,res.proteinvar_bycpg$label,cex=0.6)
+dev.copy2pdf(file='./Fig-proteinvariance_explained.pdf',width=6,height=5)
+
+res.proteinvar_bycpg$label=''
+     temp1=res.proteinvar_bycpg$varciscpgadj>=0.15 | res.proteinvar_bycpg$varcissnpadj>=0.5
+     table(temp1)
+     res.proteinvar_bycpg$label[temp1]=res.proteinvar_bycpg$protein[temp1]     
+plot(res.proteinvar_bycpg$varciscpgadj~res.proteinvar_bycpg$varcissnpadj,pch=20,col='darkblue', cex=0.6,
+     xlab="variance explained by cis-pQTLs \n after adjusting cis-pQTMs", 
+     ylab="variance explained by cis-pQTMs \n after adjusting cis-pQTLs")
+     #text(res.proteinvar_bycpg$varcissnpadj,res.proteinvar_bycpg$varciscpgadj,res.proteinvar_bycpg$label,cex=0.6)
+dev.copy2pdf(file='./Fig-proteinvariance_explained2.pdf',width=6,height=5)
+
+res.proteinvar_bycpg$others=1-res.proteinvar_bycpg$varciscpgadj-res.proteinvar_bycpg$varcissnpadj 
+res.proteinvar_bycpg$vartotal=1
+     summary(res.proteinvar_bycpg$varciscpgadj+res.proteinvar_bycpg$varcissnpadj)    
+     
+res.proteinvar_bycpg=dplyr::arrange(res.proteinvar_bycpg,desc(varciscpgadj))
+    head(res.proteinvar_bycpg)
+    res.proteinvar_bycpg$x=1:nrow(res.proteinvar_bycpg)
+    res.proteinvar_bycpg$y1=res.proteinvar_bycpg$varciscpgadj
+    res.proteinvar_bycpg$y2=res.proteinvar_bycpg$varciscpgadj+res.proteinvar_bycpg$varcissnp
+    
+temp1=res.proteinvar_bycpg
+    temp11=temp1[temp1$varciscpgadj/temp1$varcissnpadj>=0.4,]
+    temp12=temp1[temp1$varciscpgadj/temp1$varcissnpadj<0.4,]
+    
+    temp11=dplyr::arrange(temp11,desc(varciscpgadj))
+    temp12=dplyr::arrange(temp12,varcissnpadj)
+    temp1=rbind(temp11,temp12)
+    
+    head(temp1$cisSNPNum)
+    tail(temp1$cisSNPNum)
+    head(temp1$ciscpg_len)
+    tail(temp1$ciscpg_len)
+    
+par(mar=c(4,4,2,3),mgp=c(2,0.5,0))
+    temp2=barplot(temp1$vartotal,border=NA,space=0.2,horiz=F,las=2,cex.names=0.4,xlab='',ylab='variance explained',
+            col=col.partition$col[col.partition$group=='Others'],xaxs = "i") # names.arg=res.proteinvar_bycpg$protein
+    head(temp2,2)
+    tail(temp2,2)
+    barplot(temp1$varciscpgadj+temp1$varcissnpadj,border=NA,space=0.2,horiz=F,las=2,xlab='',ylab='',col=col.partition$col[col.partition$group=='Genetics'],add=T)
+    barplot(temp1$varciscpgadj,border=NA,space=0.2,horiz=F,las=2,xlab='',ylab='',col=col.partition$col[col.partition$group=='Methylation'],add=T)
+    axis(1, at=as.vector(temp2), labels = temp1$protein,las = 2, cex.axis = 0.4, tck=0)
+    box()
+dev.copy2pdf(file='./Fig-proteinvariance_explained4.pdf',width=20,height=5)
+
+# add bottom heatmap    
+load('./Results/pQTM/da.pQTM_cis_All.RData')
+res.GOcis=gometh(sig.cpg=da.pQTM_cis_W, all.cpg=NULL, array.type = "EPIC", collection = "GO",sig.genes=T)
+
+res.select_proteins_sorted_GO=NA
+    table(res.GO_top20_cis_trans_both$group)   
+    temp1=tail(res.GO_top20_cis_trans_both[res.GO_top20_cis_trans_both$group=='only_cispQTMs',],N)
+    temp1=data.frame(GO=rownames(temp1),term=temp1$cis_TERM)[N:1,]
+    temp1
+    for(i in 1:N){
+      print(i)
+      if(temp1$GO[i] %in% keys(org.Hs.eg.db, keytype = "GO")){
+          temp2=NA
+          temp2=AnnotationDbi::select(org.Hs.eg.db,keys=temp1$GO[i],keytype = "GO",columns = c("SYMBOL"))
+          temp2=as.numeric(var.select_proteins_sorted %in% temp2$SYMBOL)
+          temp2=data.frame(t(matrix(temp2)))
+          rownames(temp2)=paste0(temp1$GO[i],'(',temp1$term[i],')')
+          colnames(temp2)=var.select_proteins_sorted
+          
+          if(sum(temp2)>0){
+              if(is.logical(res.select_proteins_sorted_GO)){
+                res.select_proteins_sorted_GO=temp2
+              }else{
+                res.select_proteins_sorted_GO=rbind(res.select_proteins_sorted_GO,temp2)
+              }
+          }
+      }else{
+          temp2=matrix(0,nrow=length(var.select_proteins_sorted),ncol=1)
+      }
+    }
+    
+    temp1=tail(res.GO_top20_cis_trans_both[res.GO_top20_cis_trans_both$group=='only_transpQTMs',],N)
+    temp1=data.frame(GO=rownames(temp1),term=temp1$cis_TERM)[N:1,]
+    temp1
+    for(i in 1:N){
+      print(i)
+      if(temp1$GO[i] %in% keys(org.Hs.eg.db, keytype = "GO")){
+          temp2=NA
+          temp2=AnnotationDbi::select(org.Hs.eg.db,keys=temp1$GO[i],keytype = "GO",columns = c("SYMBOL"))
+          temp2=as.numeric(var.select_proteins_sorted %in% temp2$SYMBOL)
+          temp2=data.frame(t(matrix(temp2)))
+          rownames(temp2)=paste0(temp1$GO[i],'(',temp1$term[i],')')
+          colnames(temp2)=var.select_proteins_sorted
+          
+          if(sum(temp2)>0){
+              if(is.logical(res.select_proteins_sorted_GO)){
+                res.select_proteins_sorted_GO=temp2
+              }else{
+                res.select_proteins_sorted_GO=rbind(res.select_proteins_sorted_GO,temp2)
+              }
+          }
+      }else{
+          temp2=matrix(0,nrow=length(var.select_proteins_sorted),ncol=1)
+      }
+    }
+    
+    temp1=tail(res.GO_top20_cis_trans_both[res.GO_top20_cis_trans_both$group=='both',],N)
+    temp1=data.frame(GO=rownames(temp1),term=temp1$cis_TERM)[N:1,]
+    temp1
+    for(i in 1:N){
+      print(i)
+      if(temp1$GO[i] %in% keys(org.Hs.eg.db, keytype = "GO")){
+          temp2=NA
+          temp2=AnnotationDbi::select(org.Hs.eg.db,keys=temp1$GO[i],keytype = "GO",columns = c("SYMBOL"))
+          temp2=as.numeric(var.select_proteins_sorted %in% temp2$SYMBOL)
+          temp2=data.frame(t(matrix(temp2)))
+          rownames(temp2)=paste0(temp1$GO[i],'(',temp1$term[i],')')
+          colnames(temp2)=var.select_proteins_sorted
+          
+          if(sum(temp2)>0){
+              if(is.logical(res.select_proteins_sorted_GO)){
+                res.select_proteins_sorted_GO=temp2
+              }else{
+                res.select_proteins_sorted_GO=rbind(res.select_proteins_sorted_GO,temp2)
+              }
+          }
+      }else{
+          temp2=matrix(0,nrow=length(var.select_proteins_sorted),ncol=1)
+      }
+    }
+    
+    res.select_proteins_sorted_GO[,1:10]
+    table(unlist(res.select_proteins_sorted_GO))
+    
+table(as.vector(res.select_proteins_sorted_GO[1,]))
+
+Heatmap(res.select_proteins_sorted_GO,cluster_columns = F,cluster_rows = F,  row_names_side = "left", 
+              rect_gp = gpar(col = NA,fill='white'),
+              row_names_gp = gpar(just = "left"),
+              cell_fun = function(j, i, x, y, width, height, fill) {
+                  if(res.select_proteins_sorted_GO[i, j]==1){
+                      grid.circle(x = x, y = y,
+                          r = unit(1.2, "mm"),
+                          gp = gpar(fill="#377EB8", col = NA))
+                  }
+              },
+              show_heatmap_legend=F)
+
+dev.copy2pdf(file='./Fig-proteinvariance_explained_bottomheatmap.pdf',width=28,height=10)
+    
+temp1=res.proteinvar_bycpg
+    temp1=dplyr::arrange(temp1,desc(varciscpgadj))
+    temp1=temp1[1:30,]
+    
+par(mar=c(4,4,2,3),mgp=c(2,0.5,0))
+    temp2=barplot(temp1$vartotal,border=NA,space=0.2,horiz=F,las=2,cex.names=0.4,xlab='',ylab='variance explained',
+            col=col.partition$col[col.partition$group=='Others'],xaxs = "i") # names.arg=res.proteinvar_bycpg$protein
+    head(temp2,2)
+    tail(temp2,2)
+    barplot(temp1$varciscpgadj+temp1$varcissnpadj,border=NA,space=0.2,horiz=F,las=2,xlab='',ylab='',col=col.partition$col[col.partition$group=='Genetics'],add=T)
+    barplot(temp1$varciscpgadj,border=NA,space=0.2,horiz=F,las=2,xlab='',ylab='',col=col.partition$col[col.partition$group=='Methylation'],add=T)
+    axis(1, at=as.vector(temp2), labels=temp1$protein,las = 2, cex.axis=0.8, tck=0)
+    box()
+dev.copy2pdf(file='./Fig-proteinvariance_explained4_1.pdf',width=6,height=5)
+
+temp1=res.proteinvar_bycpg
+    temp1=dplyr::arrange(temp1,varcissnpadj)
+    temp1=tail(temp1,30)
+    
+par(mar=c(4,4,2,3),mgp=c(2,0.5,0))
+    temp2=barplot(temp1$vartotal,border=NA,space=0.2,horiz=F,las=2,cex.names=0.4,xlab='',ylab='variance explained',
+            col=col.partition$col[col.partition$group=='Others'],xaxs = "i") # names.arg=res.proteinvar_bycpg$protein
+    head(temp2,2)
+    tail(temp2,2)
+    barplot(temp1$varciscpgadj+temp1$varcissnpadj,border=NA,space=0.2,horiz=F,las=2,xlab='',ylab='',col=col.partition$col[col.partition$group=='Genetics'],add=T)
+    barplot(temp1$varciscpgadj,border=NA,space=0.2,horiz=F,las=2,xlab='',ylab='',col=col.partition$col[col.partition$group=='Methylation'],add=T)
+    axis(1, at=as.vector(temp2), labels=temp1$protein,las = 2, cex.axis=0.8, tck=0)
+    box()
+dev.copy2pdf(file='./Fig-proteinvariance_explained4_2.pdf',width=6,height=5)
