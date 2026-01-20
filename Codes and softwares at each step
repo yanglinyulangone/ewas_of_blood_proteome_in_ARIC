@@ -187,7 +187,7 @@ osca --befile tmethylation_bod2 --make-orm --out methylation_orm
 3. estimation of the variance explained by the GRM and MRM using OREML
 *prepare phenotypes (proteins), genetic PCs, methylation PCs, and covariates before this step
 *i is the ith PC of proteome
-gcta64 --thread-num 20 --grm grm_subset --pheno da.proteomePCs --mpheno {i} --qcovar da.covar_cont --covar da.covar_dicr --reml --reml-est-fix --out ./variance/proteome_pc${i}
+osca --reml --multi-orm orm.filelist --pheno proteome_pc${i} --out myreml_${i}
 
 4. aggregation of the explained variance across individual proteomic principal components.
 
