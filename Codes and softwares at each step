@@ -15,7 +15,6 @@ The pipeline includes the following main steps:
 12. The interquartile range (IQR) was calculated to identify and remove outlier CpG markers.
 13. A final cleaned dataset of DNA methylation β-values was generated for downstream analy
 
-
 **Step 4: Estimation of genetic and epigenetic contributions to blood protein variance**
 This step consisted of four main components: 
 1. calculation of the genetic relationship matrix (GRM)
