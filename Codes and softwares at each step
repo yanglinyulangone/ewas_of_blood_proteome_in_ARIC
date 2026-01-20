@@ -1,0 +1,27 @@
+**Step 1: Preprocessing and quality control of DNA methylation data**
+Adapted from the CPACOR framework and the Infinium preprocessing pipeline (https://github.com/genepi-freiburg/Infinium-preprocessing). The pipeline was executed twice: in the first run, outlier samples were identified; these samples were then removed prior to the second run. The preprocessed data from the the second run was used for the following analysis. Both β-values and M-values were generated, and β-values were used for all analyses.
+The pipeline includes the following main steps:
+1. IDAT files were processed to generate an RGSet object.
+2. Background correction was performed, white blood cell (WBC) subtypes were estimated, and 56 SNP probes were extracted.
+3. Probes in the RGSet were classified into six groups for probe-type–specific preprocessing: Type I Green M, Type I Green U, Type I Red M, Type I Red U, Type II Green, and Type II Red.
+4. Control probes were extracted and used to derive principal components (PCs) representing technical variation, which were included as covariates in downstream linear regression models.
+5. Detection P-values were extracted and used to filter low-quality probes.
+6. Probe-level data were summarized to CpG marker–level data.
+7. CpG markers were stratified into autosomal, X-chromosomal, and Y-chromosomal groups, and subsequent preprocessing steps were performed separately for each group.
+8. High-level quality control (QC) was conducted by calculating detection P-values and filtering probes and samples based on call rate thresholds.
+9. Low-level QC included identification of sex mismatches and filtering CpG markers based on probe-type–specific call rates.
+10. Stratified quantile normalization was applied to β-values from autosomal and sex chromosome probes.
+11. Principal component analysis (PCA) was performed on control probe intensities to assess technical batch effects.
+12. The interquartile range (IQR) was calculated to identify and remove outlier CpG markers.
+13. A final cleaned dataset of DNA methylation β-values was generated for downstream analy
+
+
+**Step 4: Estimation of genetic and epigenetic contributions to blood protein variance**
+
+
+**Step 5: Epigenome-wide association study (EWAS) of circulating proteins**
+
+
+**Step 6: Gene Ontology enrichment analysis of pQTMs**
+
+**Step 7: Decomposition of protein variance by cis-pQTMs and cis-pQTLs**
