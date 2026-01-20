@@ -1,1 +1,23 @@
 The current repository contains the main code used for the study “Epigenome-Wide Association Study of the Blood Proteome in the Atherosclerosis Risk in Communities (ARIC) Study.”
+
+**Step 1: Preprocessing and quality control of DNA methylation data**
+Raw data generated using the Illumina Infinium MethylationEPIC v1.0 BeadChip were preprocessed and subjected to quality control (QC) using an adapted pipeline ([https://github.com/genepi-freiburg/Infinium-preprocessing](https://github.com/genepi-freiburg/Infinium-preprocessing)). This pipeline extends the CPACOR framework originally developed for the Illumina 450K array to accommodate the EPIC platform.
+
+**Step 2: Preprocessing and quality control of blood proteomic data**
+Blood samples in the ARIC study were collected using a standardized protocol across all four field centers, employing serum separator tubes (SST) and EDTA tubes ([https://sites.cscc.unc.edu/aric/Cohort_Manuals/Blood_Collection_And_Processing_7.PDF](https://sites.cscc.unc.edu/aric/Cohort_Manuals/Blood_Collection_And_Processing_7.PDF)). Proteomic measurements were generated following established procedures, and quality control was applied prior to downstream analyses.
+
+**Step 3: Genotyping and imputation**
+Details of genotyping, quality control, and imputation procedures in the ARIC cohort have been described previously (Bressler et al., 2017). Briefly, genome-wide genotyping data underwent standard QC measures followed by imputation to a reference panel to obtain high-quality genetic variants for analysis.
+
+**Step 4: Estimation of genetic and epigenetic contributions to blood protein variance**
+PLINK2, GCTA (Genome-wide Complex Trait Analysis), and OSCA (OmicS-data-based Complex Trait Analysis) were used to estimate the proportion of variance in circulating protein levels explained by genetic variation and DNA methylation, respectively.
+
+**Step 5: Epigenome-wide association study (EWAS) of circulating proteins**
+EWAS was performed separately for each protein using multiple linear regression models, with DNA methylation β-values as predictors and protein levels as outcomes. Models were adjusted for age, sex, study center, estimated glomerular filtration rate based on creatinine and cystatin C (eGFRcrcys), estimated blood cell composition, the top 10 genetic principal components (PCs), and the top 10 PCs derived from control probes. Multiple testing was addressed using Bonferroni correction based on the number of CpGs tested per protein. Associations with adjusted P values below 5.9 × 10⁻⁸ (0.05/841,678) were considered epigenome-wide significant. Significant CpG–protein associations were defined as protein quantitative trait methylations (pQTMs).
+
+**Step 6: Gene Ontology enrichment analysis of pQTMs**
+To gain functional insights, Gene Ontology (GO) enrichment analyses were conducted separately for cis-pQTMs and trans-pQTMs using the missMethyl package, which accounts for the differing numbers of CpGs mapped to each gene and is specifically designed for methylation array data.
+
+**Step 7: Decomposition of protein variance by cis-pQTMs and cis-pQTLs**
+Because cis-pQTLs exert strong effects on protein levels and may also influence nearby DNA methylation sites, we evaluated the contribution of cis-pQTMs to protein level variation among White participants using a stepwise modeling approach. This analysis focused on White participants due to differences in genetic architecture across ancestral groups and the larger sample size available. The stepwise framework accounts for the possibility that cis-pQTLs may influence cis-pQTMs for the same gene, while allowing for independent effects of cis-pQTMs on protein levels.
+
